@@ -45,5 +45,5 @@ Set `OPENAI_API_KEY` in `.env` (already provided). Tests automatically load it.
 ## Using the CLI
 
 - `agentflow "Draft a project summary"` invokes the Codex adapter, stores the response in `agentflow-<timestamp>.yaml`, and prints the artifact path.
-- `agentflow view --host 0.0.0.0 --port 5050` launches the Flask viewer for any AgentFlow YAML files in the current directory.
+- `agentflow view --host 0.0.0.0 --port 5050` launches the Flask viewer for any AgentFlow YAML files in the current directory. Without flags it listens on `127.0.0.1:5050` and serves an interactive DAG visualization with searchable plan list and node detail panels.
 - Generated YAML adheres to the plan schema from the PRD and includes metadata, timeline, usage metrics, and adapter events for auditability.

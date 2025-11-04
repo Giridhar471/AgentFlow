@@ -27,66 +27,536 @@ INDEX_TEMPLATE = """<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>AgentFlow Plans</title>
+  <title>AgentFlow Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body { font-family: Arial, sans-serif; margin: 2rem; background: #f7f7f7; color: #333; }
-    h1 { margin-bottom: 1rem; }
-    table { border-collapse: collapse; width: 100%; background: #fff; }
-    th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #ddd; }
-    th { background: #f0f0f0; }
-    tr:hover { background: #f5f5f5; }
-    code { background: #eee; padding: 0.15rem 0.3rem; border-radius: 4px; }
-    .status-badge { padding: 0.25rem 0.5rem; border-radius: 1rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
-    .status-completed { background: #d4f4dd; color: #1b6b3a; }
-    .status-failed { background: #f8d7da; color: #842029; }
-    .status-other { background: #dbeafe; color: #1d4ed8; }
-    .footer { margin-top: 2rem; font-size: 0.85rem; color: #666; }
-    .empty { padding: 2rem; background: #fff; text-align: center; border: 1px dashed #ccc; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+    }
+    header {
+      padding: 1.25rem 2rem;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    header h1 {
+      margin: 0;
+      font-size: 1.35rem;
+      letter-spacing: 0.04em;
+    }
+    header span {
+      font-size: 0.85rem;
+      color: rgba(148, 163, 184, 0.9);
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      min-height: calc(100vh - 72px);
+    }
+    @media (max-width: 960px) {
+      .layout { grid-template-columns: 100%; }
+      aside {
+        position: sticky;
+        top: 72px;
+        max-height: 280px;
+        overflow-y: auto;
+      }
+    }
+    aside {
+      border-right: 1px solid rgba(148, 163, 184, 0.15);
+      background: linear-gradient(180deg, rgba(15, 23, 42, 0.92), rgba(15, 23, 42, 0.88));
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .plan-search {
+      padding: 0.65rem 0.85rem;
+      border-radius: 0.65rem;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(15, 23, 42, 0.6);
+      color: inherit;
+    }
+    .plan-search::placeholder {
+      color: rgba(148, 163, 184, 0.8);
+    }
+    .plan-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      overflow-y: auto;
+      padding-right: 0.35rem;
+    }
+    .plan-card {
+      padding: 0.75rem 0.9rem;
+      border-radius: 0.75rem;
+      border: 1px solid transparent;
+      background: rgba(30, 41, 59, 0.55);
+      transition: all 0.18s ease-in-out;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+    .plan-card:hover { border-color: rgba(148, 163, 184, 0.35); transform: translateY(-1px); }
+    .plan-card.active {
+      border-color: rgba(56, 189, 248, 0.75);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.3);
+    }
+    .plan-card h2 {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #f1f5f9;
+    }
+    .plan-card .meta {
+      font-size: 0.78rem;
+      color: rgba(148, 163, 184, 0.9);
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      border-radius: 999px;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+    .status-completed { background: rgba(45, 212, 191, 0.18); color: #5eead4; }
+    .status-running { background: rgba(56, 189, 248, 0.18); color: #38bdf8; }
+    .status-failed { background: rgba(248, 113, 113, 0.18); color: #f87171; }
+    .status-pending { background: rgba(251, 191, 36, 0.18); color: #fbbf24; }
+    .status-other { background: rgba(148, 163, 184, 0.18); color: #cbd5f5; }
+    main {
+      display: flex;
+      flex-direction: column;
+      padding: 1.5rem 1.75rem;
+      gap: 1.25rem;
+    }
+    .graph-container {
+      flex: 1;
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: 1rem;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-height: 420px;
+    }
+    #graph {
+      flex: 1;
+      border-radius: 0.85rem;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+    }
+    .summary-panel {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    .summary-card {
+      padding: 1rem;
+      border-radius: 0.85rem;
+      background: rgba(30, 41, 59, 0.65);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    .summary-card h3 {
+      margin: 0 0 0.5rem;
+      font-size: 0.9rem;
+      color: rgba(226, 232, 240, 0.9);
+    }
+    .summary-card p, .summary-card ul {
+      margin: 0;
+      font-size: 0.85rem;
+      color: rgba(148, 163, 184, 0.95);
+    }
+    .summary-card ul {
+      list-style: none;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+    .summary-card li {
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 999px;
+      padding: 0.2rem 0.55rem;
+    }
+    .node-detail {
+      border-radius: 0.85rem;
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      padding: 1.2rem;
+    }
+    .node-detail h2 {
+      margin: 0 0 0.75rem;
+      font-size: 1.1rem;
+    }
+    .node-detail pre {
+      background: rgba(15, 23, 42, 0.75);
+      border-radius: 0.65rem;
+      padding: 0.75rem;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    .empty-state {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 3rem 1rem;
+      opacity: 0.75;
+    }
+    footer {
+      padding: 1rem 2rem;
+      font-size: 0.85rem;
+      color: rgba(148, 163, 184, 0.7);
+      border-top: 1px solid rgba(148, 163, 184, 0.2);
+      background: rgba(15, 23, 42, 0.92);
+    }
+    a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+    a:hover { text-decoration: underline; }
   </style>
+  <script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js" integrity="sha384-J0LCJeLvvcSp5pB0Aw3+8aVBRm2gIF5fz9wzwMojV2Xxk6v9zzUGULF2hFXhb4RL" crossorigin="anonymous"></script>
+  <script>
+    const statusToClass = (status) => {
+      if (!status) return "status-other";
+      const value = String(status).toLowerCase();
+      if (value === "completed" || value === "succeeded") return "status-completed";
+      if (value === "running" || value === "in_progress") return "status-running";
+      if (value === "failed") return "status-failed";
+      if (value === "pending" || value === "blocked") return "status-pending";
+      return "status-other";
+    };
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const rootDirectory = document.body.dataset.root || "";
+      const sidebar = document.querySelector(".plan-list");
+      const searchInput = document.querySelector(".plan-search");
+      const planSummary = document.querySelector(".summary-panel");
+      const nodeDetail = document.querySelector(".node-detail");
+      const graphContainer = document.getElementById("graph");
+      const emptyState = document.querySelector(".graph-container .empty-state");
+      const planTitle = document.querySelector("[data-plan-title]");
+      const planMeta = document.querySelector("[data-plan-meta]");
+      const statusBadge = document.querySelector("[data-plan-status]");
+      const planLinks = document.querySelector("[data-plan-links]");
+      const rootPath = document.querySelector("[data-root-path]");
+      let cyInstance = null;
+      let plans = [];
+      let filteredPlans = [];
+      let activePlan = null;
+      let nodeLookup = {};
+
+      if (rootPath) {
+        rootPath.textContent = rootDirectory;
+      }
+
+      const formatDate = (value) => {
+        if (!value) return "--";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return value;
+        return date.toLocaleString();
+      };
+
+      const escapeHtml = (value) => {
+        if (value === null || value === undefined) return "";
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+      };
+
+      const renderPlans = () => {
+        if (!sidebar) return;
+        sidebar.innerHTML = "";
+        if (!filteredPlans.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.innerHTML = "<p>No plans found. Run <code>agentflow \\\"your prompt\\\"</code> to create one.</p>";
+          sidebar.appendChild(empty);
+          return;
+        }
+
+        filteredPlans.forEach((plan) => {
+          const card = document.createElement("div");
+          const isActive = activePlan && activePlan.plan_id === plan.plan_id;
+          card.className = "plan-card" + (isActive ? " active" : "");
+          const statusLabel = escapeHtml(plan.status || "unknown");
+          const title = escapeHtml(plan.name || plan.plan_id);
+          const planId = escapeHtml(plan.plan_id);
+          const created = escapeHtml(formatDate(plan.created_at));
+          card.innerHTML = `
+            <div class="status-pill ${statusToClass(plan.status)}">${statusLabel}</div>
+            <h2>${title}</h2>
+            <div class="meta">${planId}</div>
+            <div class="meta">${created}</div>
+          `;
+          card.addEventListener("click", () => loadPlan(plan.plan_id));
+          sidebar.appendChild(card);
+        });
+      };
+
+      const renderPlanSummary = (detail) => {
+        if (!planTitle || !planMeta || !statusBadge || !planLinks) return;
+        planTitle.textContent = detail.name || detail.plan_id;
+        planMeta.textContent = "Plan ID " + detail.plan_id + " | Created " + formatDate(detail.created_at) + " | Updated " + formatDate(detail.last_updated);
+        statusBadge.textContent = detail.status || "unknown";
+        statusBadge.className = "status-pill " + statusToClass(detail.status);
+        const downloadHref = "/files/" + encodeURIComponent(detail.filename || "");
+        planLinks.innerHTML = '<a href="' + downloadHref + '" target="_blank" rel="noopener">Download YAML</a>';
+
+        if (!planSummary) {
+          return;
+        }
+
+        planSummary.innerHTML = "";
+        const statusCard = document.createElement("div");
+        statusCard.className = "summary-card";
+        const statusEntries = Object.entries(detail.status_counts || {});
+        const statusText = statusEntries.length
+          ? statusEntries
+              .map(([status, count]) => "<strong>" + escapeHtml(count) + "</strong> " + escapeHtml(status))
+              .join(" | ")
+          : "No nodes";
+        statusCard.innerHTML = "<h3>Status Breakdown</h3><p>" + statusText + "</p>";
+
+        const metricsCard = document.createElement("div");
+        metricsCard.className = "summary-card";
+        const metrics = detail.metrics || {};
+        const metricEntries = Object.entries(metrics);
+        let metricsContent = "<p>No metrics reported.</p>";
+        if (metricEntries.length) {
+          const lines = metricEntries
+            .map(([key, value]) => {
+              const printable = typeof value === "object" ? JSON.stringify(value, null, 2) : String(value);
+              return key + ": " + printable;
+            })
+            .join("\\n");
+          metricsContent = "<pre>" + escapeHtml(lines) + "</pre>";
+        }
+        metricsCard.innerHTML = "<h3>Metrics</h3>" + metricsContent;
+
+        const tagsCard = document.createElement("div");
+        tagsCard.className = "summary-card";
+        const tags = detail.tags || [];
+        tagsCard.innerHTML = "<h3>Tags</h3><ul>" + (tags.length ? tags.map((tag) => "<li>" + escapeHtml(tag) + "</li>").join("") : "<li>None</li>") + "</ul>";
+
+        planSummary.appendChild(statusCard);
+        planSummary.appendChild(metricsCard);
+        planSummary.appendChild(tagsCard);
+      };
+
+      const renderNodeDetail = (nodeId) => {
+        if (!nodeDetail) return;
+        const node = nodeId ? nodeLookup[nodeId] : null;
+        if (!node) {
+          nodeDetail.innerHTML = "<h2>Select a node</h2><p>Choose a node in the graph to inspect its details.</p>";
+          return;
+        }
+        const statusLabel = escapeHtml(node.status || "unknown");
+        const summary = escapeHtml(node.summary || node.id);
+        const nodeId = escapeHtml(node.id);
+        const nodeType = escapeHtml(node.type || "unknown");
+        const dependsOn = (node.depends_on || []).length
+          ? node.depends_on.map((dep) => escapeHtml(dep)).join(", ")
+          : "None";
+        const buildBlock = (label, data) => {
+          const text = JSON.stringify(data, null, 2);
+          return "<h3>" + escapeHtml(label) + "</h3><pre>" + escapeHtml(text) + "</pre>";
+        };
+
+        nodeDetail.innerHTML = `
+          <div class="status-pill ${statusToClass(node.status)}">${statusLabel}</div>
+          <h2>${summary}</h2>
+          <p><strong>Node:</strong> ${nodeId} | <strong>Type:</strong> ${nodeType} | <strong>Depends on:</strong> ${dependsOn}</p>
+          ${buildBlock("Inputs", node.inputs || {})}
+          ${buildBlock("Outputs", node.outputs || {})}
+          ${buildBlock("Artifacts", node.artifacts || [])}
+          ${buildBlock("History", node.history || [])}
+        `;
+      };
+
+      const configureGraph = (elements) => {
+        if (!graphContainer) return;
+        if (cyInstance) {
+          cyInstance.destroy();
+        }
+        cyInstance = cytoscape({
+          container: graphContainer,
+          elements: elements,
+          zoomingEnabled: true,
+          userZoomingEnabled: true,
+          layout: { name: "breadthfirst", directed: true, padding: 25, spacingFactor: 1.6 },
+          style: [
+            {
+              selector: "node",
+              style: {
+                "background-color": ele => {
+                  const status = ele.data("status");
+                  const cls = statusToClass(status);
+                  if (cls === "status-completed") return "#22d3ee";
+                  if (cls === "status-running") return "#38bdf8";
+                  if (cls === "status-failed") return "#f87171";
+                  if (cls === "status-pending") return "#fbbf24";
+                  return "#94a3b8";
+                },
+                label: "data(label)",
+                "font-size": "12px",
+                color: "#0f172a",
+                "font-weight": 600,
+                "text-wrap": "wrap",
+                "text-max-width": "140px",
+                width: 48,
+                height: 48,
+                "border-width": 4,
+                "border-style": "solid",
+                "border-color": "#0f172a",
+                "overlay-opacity": 0.12,
+                "overlay-padding": "6px"
+              }
+            },
+            {
+              selector: "edge",
+              style: {
+                width: 3,
+                "curve-style": "bezier",
+                "target-arrow-shape": "triangle",
+                "target-arrow-color": "rgba(148, 163, 184, 0.9)",
+                "line-color": "rgba(148, 163, 184, 0.45)"
+              }
+            },
+            {
+              selector: "node:selected",
+              style: {
+                "border-color": "#f8fafc",
+                "border-width": 5
+              }
+            }
+          ]
+        });
+
+        cyInstance.on("tap", "node", (evt) => {
+          const nodeId = evt.target.id();
+          renderNodeDetail(nodeId);
+        });
+      };
+
+      const loadPlan = async (planId) => {
+        if (!planId) return;
+        try {
+          const response = await fetch("/api/plans/" + encodeURIComponent(planId));
+          if (!response.ok) throw new Error("Unable to load plan " + planId);
+          const detail = await response.json();
+          activePlan = detail;
+          nodeLookup = detail.nodes_index || {};
+          renderPlanSummary(detail);
+          configureGraph(detail.graph_elements || []);
+          renderNodeDetail(null);
+          renderPlans();
+          if (emptyState) {
+            emptyState.style.display = "none";
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      };
+
+      const loadPlans = async () => {
+        if (!sidebar) return;
+        try {
+          const response = await fetch("/api/plans");
+          if (!response.ok) throw new Error("Unable to fetch plans");
+          plans = await response.json();
+          filteredPlans = plans.slice();
+          renderPlans();
+          if (filteredPlans.length) {
+            loadPlan(filteredPlans[0].plan_id);
+          }
+        } catch (error) {
+          console.error(error);
+          sidebar.innerHTML = "<div class='empty-state'><p>Failed to load plans. Check server logs.</p></div>";
+        }
+      };
+
+      if (searchInput) {
+        searchInput.addEventListener("input", (event) => {
+          const query = String(event.target.value || "").toLowerCase();
+          filteredPlans = plans.filter((plan) => {
+            const haystack = [plan.plan_id, plan.name, plan.status].join(" ").toLowerCase();
+            return haystack.includes(query);
+          });
+          renderPlans();
+        });
+      }
+
+      loadPlans();
+    });
+  </script>
 </head>
-<body>
-  <h1>AgentFlow Plans</h1>
-  {% if plans %}
-  <table>
-    <thead>
-      <tr>
-        <th>Plan</th>
-        <th>Status</th>
-        <th>Created</th>
-        <th>Updated</th>
-        <th>Actions</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for plan in plans %}
-      <tr>
-        <td>
-          <strong>{{ plan.name }}</strong><br>
-          <code>{{ plan.plan_id }}</code><br>
-          <small>{{ plan.filename }}</small>
-        </td>
-        <td>
-          <span class="status-badge {{ plan.status_class }}">{{ plan.status }}</span>
-        </td>
-        <td>{{ plan.created_at or "—" }}</td>
-        <td>{{ plan.last_updated or "—" }}</td>
-        <td>
-          <a href="/plans/{{ plan.plan_id }}">View JSON</a> |
-          <a href="/files/{{ plan.filename }}">Download YAML</a>
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-    <div class="empty">
-      <p>No AgentFlow plan artifacts found.</p>
-      <p>Run <code>agentflow "your prompt"</code> to create one.</p>
+<body data-root="{{ root_directory }}">
+  <header>
+    <div>
+      <h1>AgentFlow Viewer</h1>
+      <span>Explore execution DAGs for plan artifacts</span>
     </div>
-  {% endif %}
-  <div class="footer">
-    Serving directory: <code>{{ root_directory }}</code>
+    <span class="status-pill status-other">Serving <span data-root-path></span></span>
+  </header>
+
+  <div class="layout">
+    <aside>
+      <input type="search" class="plan-search" placeholder="Search plans..." aria-label="Search plans">
+      <div class="plan-list"></div>
+    </aside>
+
+    <main>
+      <div>
+        <div class="status-pill status-other" data-plan-status>Loading</div>
+        <h2 data-plan-title>Loading plan...</h2>
+        <p data-plan-meta>Hang tight while we load your artifacts.</p>
+        <p data-plan-links></p>
+      </div>
+
+      <section class="summary-panel"></section>
+
+      <section class="graph-container">
+        <div class="empty-state">
+          <p>Choose a plan to visualize its execution DAG.</p>
+        </div>
+        <div id="graph" role="presentation"></div>
+      </section>
+
+      <section class="node-detail">
+        <h2>Select a node</h2>
+        <p>Choose a node in the graph to inspect its details.</p>
+      </section>
+    </main>
   </div>
+
+  <footer>
+    AgentFlow Viewer - DAG visualization for plan artifacts in <code>{{ root_directory }}</code>
+  </footer>
 </body>
 </html>
 """
@@ -102,16 +572,27 @@ def _create_app(root: Path) -> Flask:
 
     @app.route("/")
     def index():
-        plans = [_serialize_summary(artifact) for artifact in _discover_plans(root)]
-        return render_template_string(INDEX_TEMPLATE, plans=plans, root_directory=str(root))
+        return render_template_string(INDEX_TEMPLATE, root_directory=str(root))
+
+    @app.route("/api/plans")
+    def api_list_plans():
+        summaries = [_summary_payload(artifact) for artifact in _discover_plans(root)]
+        return jsonify(summaries)
+
+    @app.route("/api/plans/<plan_id>")
+    def api_view_plan(plan_id: str):
+        artifact = _find_plan(root, plan_id)
+        if not artifact:
+            abort(404, description=f"Plan {plan_id} not found.")
+        return jsonify(_plan_detail_payload(artifact))
 
     @app.route("/plans")
-    def list_plans():
+    def legacy_list_plans():
         summaries = [_summary_payload(artifact) for artifact in _discover_plans(root)]
         return jsonify(summaries)
 
     @app.route("/plans/<plan_id>")
-    def view_plan(plan_id: str):
+    def legacy_view_plan(plan_id: str):
         artifact = _find_plan(root, plan_id)
         if not artifact:
             abort(404, description=f"Plan {plan_id} not found.")
@@ -186,20 +667,75 @@ def _summary_payload(artifact: PlanArtifact) -> Dict[str, Any]:
     }
 
 
-def _serialize_summary(artifact: PlanArtifact) -> Dict[str, Any]:
-    status = artifact.status or "unknown"
-    status_class = "status-other"
-    if status == "completed":
-        status_class = "status-completed"
-    elif status == "failed":
-        status_class = "status-failed"
+def _plan_detail_payload(artifact: PlanArtifact) -> Dict[str, Any]:
+    payload = _load_payload(artifact.path)
+    raw_nodes = payload.get("nodes") or []
+    nodes_index: Dict[str, Dict[str, Any]] = {}
+    graph_elements: List[Dict[str, Any]] = []
+    status_counts: Dict[str, int] = {}
+
+    for node in raw_nodes:
+        node_id = str(node.get("id") or "")
+        if not node_id:
+            continue
+        status = str(node.get("status") or "unknown")
+        status_counts[status] = status_counts.get(status, 0) + 1
+        label = node.get("summary") or node_id
+        node_payload = {
+            "id": node_id,
+            "summary": node.get("summary"),
+            "type": node.get("type"),
+            "status": status,
+            "depends_on": list(node.get("depends_on") or []),
+            "attempt": node.get("attempt"),
+            "inputs": node.get("inputs") or {},
+            "outputs": node.get("outputs") or {},
+            "artifacts": node.get("artifacts") or [],
+            "metrics": node.get("metrics") or {},
+            "timeline": node.get("timeline") or {},
+            "history": node.get("history") or [],
+        }
+        nodes_index[node_id] = node_payload
+        graph_elements.append(
+            {
+                "data": {
+                    "id": node_id,
+                    "label": label,
+                    "status": status,
+                    "type": node_payload["type"] or "task",
+                }
+            }
+        )
+
+    for node in raw_nodes:
+        node_id = str(node.get("id") or "")
+        if not node_id:
+            continue
+        for dependency in node.get("depends_on") or []:
+            dep_id = str(dependency)
+            if dep_id not in nodes_index:
+                continue
+            edge_id = f"{dep_id}->{node_id}"
+            graph_elements.append(
+                {
+                    "data": {
+                        "id": edge_id,
+                        "source": dep_id,
+                        "target": node_id,
+                    }
+                }
+            )
 
     return {
         "plan_id": artifact.plan_id,
         "name": artifact.name,
-        "status": status,
-        "status_class": status_class,
+        "status": artifact.status,
         "filename": artifact.filename,
         "created_at": artifact.created_at,
         "last_updated": artifact.last_updated,
+        "tags": payload.get("tags") or [],
+        "metrics": payload.get("metrics") or {},
+        "status_counts": status_counts,
+        "graph_elements": graph_elements,
+        "nodes_index": nodes_index,
     }
