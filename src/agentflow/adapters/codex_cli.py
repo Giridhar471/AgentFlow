@@ -80,7 +80,7 @@ class CodexCLIAdapter:
         env = os.environ.copy()
         env["OPENAI_API_KEY"] = self._settings.openai_api_key
 
-        command = self.build_base_command() + [prompt]
+        command = self.build_base_command() + ["-"]
 
         completed = subprocess.run(
             command,
@@ -89,6 +89,7 @@ class CodexCLIAdapter:
             timeout=timeout,
             env=env,
             cwd=cwd,
+            input=prompt,
         )
 
         if completed.returncode != 0:

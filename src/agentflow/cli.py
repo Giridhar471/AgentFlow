@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -282,12 +283,19 @@ def _perform_self_evaluation(
     response: str,
 ) -> Optional[Dict[str, Any]]:
     evaluation_prompt = (
-        "You are an impartial self-evaluation judge. Score the assistant's response from 0 to 1, "
-        "where 1 represents a perfect answer and 0 represents a useless answer.\n"
-        "Return ONLY a JSON object with keys `score` (float between 0 and 1) and `justification` (string). "
-        "Do not wrap the JSON in code fences or add commentary.\n"
-        f"Original prompt:\n{prompt}\n\nAssistant response:\n{response}\n"
-    )
+        "You are an impartial self-evaluation judge. Score how well the assistant's reply satisfies the "
+        "original prompt. The score must be a float between 0.0 and 1.0 inclusive, where 1.0 represents a perfect answer.\n"
+        "Respond STRICTLY with a single-line JSON object of the form "
+        '{"score": <float>, "justification": "<concise reasoning>"}.\n'
+        "Do not emit any extra text, markdown, or code fences. If you cannot evaluate, still return JSON with score 0.0.\n"
+        "Conversation to evaluate:\n"
+        "User:\n<<<\n"
+        f"{prompt}\n"
+        ">>>\n"
+        "Assistant:\n<<<\n"
+        f"{response}\n"
+        ">>>\n"
+        )
 
     try:
         evaluation_result = adapter.run(evaluation_prompt)
@@ -317,7 +325,7 @@ def _parse_evaluation_payload(message: str) -> Optional[Dict[str, Any]]:
     try:
         payload = json.loads(candidate)
     except json.JSONDecodeError:
-        return None
+        return _parse_plaintext_evaluation(message)
 
     score = payload.get("score")
     try:
@@ -360,6 +368,58 @@ def _build_evaluation_outputs(evaluation_payload: Dict[str, Any]) -> Dict[str, A
     outputs["events"] = evaluation_payload.get("events", [])
     outputs["usage"] = evaluation_payload.get("usage", {})
     return outputs
+
+
+def _parse_plaintext_evaluation(message: str) -> Optional[Dict[str, Any]]:
+    score: Optional[float] = None
+    justification_parts: List[str] = []
+    lines = message.splitlines()
+
+    for index, raw_line in enumerate(lines):
+        stripped_line = raw_line.strip()
+        if not stripped_line:
+            continue
+
+        normalized = stripped_line.lstrip("-*").strip()
+        lower = normalized.lower()
+
+        if lower.startswith("score"):
+            numeric_match = re.search(r"([0-9]+(?:\.[0-9]+)?)", normalized)
+            if numeric_match:
+                try:
+                    score = float(numeric_match.group(1))
+                except ValueError:
+                    score = None
+            continue
+
+        if re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", normalized):
+            try:
+                score = float(normalized)
+            except ValueError:
+                score = None
+            continue
+
+        if lower.startswith(("reason", "justification", "rationale")):
+            text = normalized.split(":", 1)[1].strip() if ":" in normalized else normalized
+            if text:
+                justification_parts.append(text)
+
+            for follow in lines[index + 1 :]:
+                follow_stripped = follow.strip()
+                if not follow_stripped:
+                    continue
+                follow_normalized = follow_stripped.lstrip("-*").strip()
+                follow_lower = follow_normalized.lower()
+                if follow_lower.startswith(("score", "reason", "justification", "rationale")):
+                    break
+                justification_parts.append(follow_normalized)
+            break
+
+    if score is None:
+        return None
+
+    justification = " ".join(justification_parts).strip() or None
+    return {"score": score, "justification": justification}
 
 
 if __name__ == "__main__":  # pragma: no cover - module entry point

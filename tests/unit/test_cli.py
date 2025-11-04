@@ -19,7 +19,7 @@ class FakeAdapter:
                 events=events,
                 usage={"output_tokens": 5, "input_tokens": 10},
             )
-        evaluation_message = '{"score": 0.9, "justification": "Meets requirements."}'
+        evaluation_message = "Score: 0.85\n- Reason: Meets requirements."
         return CodexResult(
             message=evaluation_message,
             events=[],
@@ -46,10 +46,10 @@ def test_main_creates_yaml_on_success(monkeypatch, tmp_path):
     assert payload["nodes"][0]["outputs"]["message"] == "Hello tester!"
     assert payload["nodes"][0]["metrics"]["usage"]["output_tokens"] == 5
     evaluation = payload["nodes"][0]["outputs"]["evaluation"]
-    assert evaluation["score"] == 0.9
+    assert evaluation["score"] == 0.85
     assert evaluation["justification"] == "Meets requirements."
-    assert payload["nodes"][0]["metrics"]["evaluation_score"] == 0.9
-    assert payload["eval_metrics"]["self_evaluation_score"] == 0.9
+    assert payload["nodes"][0]["metrics"]["evaluation_score"] == 0.85
+    assert payload["eval_metrics"]["self_evaluation_score"] == 0.85
 
 
 class FailingAdapter:
