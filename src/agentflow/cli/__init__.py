@@ -7,6 +7,8 @@ from agentflow.adapters import (
     CopilotCLIError,
     MockAdapter,
     MockAdapterError,
+    GeminiCLIAdapter,
+    GeminiCLIError,
     ClaudeCLIAdapter,
     ClaudeCLIError,
 )
@@ -27,6 +29,8 @@ __all__ = [
     "CopilotCLIError",
     "MockAdapter",
     "MockAdapterError",
+    "GeminiCLIAdapter",
+    "GeminiCLIError",
     "ClaudeCLIAdapter",
     "ClaudeCLIError",
     "Settings",

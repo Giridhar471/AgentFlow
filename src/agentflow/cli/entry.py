@@ -39,6 +39,7 @@ def _resolve_adapter(adapter_name: str) -> Tuple[Callable[[Settings], object], T
         "mock": (cli_module.MockAdapter, cli_module.MockAdapterError),
         "copilot": (cli_module.CopilotCLIAdapter, cli_module.CopilotCLIError),
         "codex": (cli_module.CodexCLIAdapter, cli_module.CodexCLIError),
+        "gemini": (cli_module.GeminiCLIAdapter, cli_module.GeminiCLIError),
         "claude": (cli_module.ClaudeCLIAdapter, cli_module.ClaudeCLIError),
     }
     if adapter_name not in adapters:

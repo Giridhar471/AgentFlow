@@ -32,6 +32,8 @@ class Settings:
     approval_policy: str = "on-request"
     copilot_cli_path: str = "copilot"
     copilot_token: Optional[str] = None
+    gemini_cli_path: str = "gemini"
+    gemini_api_key: Optional[str] = None
 
     # Anthropic/Claude
     anthropic_api_key: Optional[str] = None
@@ -73,6 +75,8 @@ class Settings:
         approval = environ.get("AGENTFLOW_APPROVAL_POLICY", "on-request")
         copilot_path = environ.get("AGENTFLOW_COPILOT_PATH", "copilot")
         copilot_token = environ.get("AGENTFLOW_COPILOT_TOKEN")
+        gemini_path = environ.get("AGENTFLOW_GEMINI_PATH", "gemini")
+        gemini_api_key = environ.get("AGENTFLOW_GEMINI_API_KEY")
 
         anthropic_cli = environ.get("AGENTFLOW_ANTHROPIC_PATH", "anthropic")
         anthropic_model = environ.get("AGENTFLOW_ANTHROPIC_MODEL", "claude-3-5-sonnet-latest")
@@ -89,6 +93,8 @@ class Settings:
             approval_policy=approval,
             copilot_cli_path=copilot_path,
             copilot_token=copilot_token,
+            gemini_cli_path=gemini_path,
+            gemini_api_key=gemini_api_key,
             anthropic_api_key=anthropic_api_key,
             anthropic_cli_path=anthropic_cli,
             anthropic_model=anthropic_model,
